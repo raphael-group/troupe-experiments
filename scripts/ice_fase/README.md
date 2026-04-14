@@ -1,14 +1,27 @@
 To convert trees:
 
-python convert_sim_trees.py --folder /n/fs/ragr-research/users/ryz/new_org/inputs --num_trees 16
+python scripts/ice_fase/convert_sim_trees.py \
+--folder /n/fs/ragr-research/users/wh8114/projects/troupe_experiments/data/subsampled_leaves_4_terminals \
+--num_trees 8 16 32 64 \
+--samples 0.05 0.1 0.2 \
+--num_trials 10
+
 
 
 
 To run ice_fase:
 
-Rscript ice_fase/run_ice_fase.R \
-    -p test_outputs/test \
-    -l /n/fs/ragr-research/users/ryz/new_org/inputs/16/trial_0/16_trial_0_locations.tsv
+NUM_TREES=8
+SAMPLE=0.05
+TRIAL=0
+RESULTS_DIR=$PWD/results/subsampled_leaves_4_terminals/ice_fase/trees_$NUM_TREES/time_5.0/sample_$SAMPLE/trial_$TRIAL/inferred
+DATA_DIR=$PWD/data/subsampled_leaves_4_terminals/trees_$NUM_TREES/time_5.0/sample_$SAMPLE/trial_$TRIAL/tree_nwks/locations.tsv
+
+mkdir -p $RESULTS_DIR
+
+Rscript scripts/ice_fase/run_ice_fase.R \
+    -p $RESULTS_DIR \
+    -l $DATA_DIR
 
 
 

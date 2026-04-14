@@ -4,12 +4,12 @@ set -euo pipefail
 # Submit unconstrained ClaSSE MLE runs as a Slurm job array.
 # One array task per (dataset x num_hidden) combination.
 #
-# Normal usage — submits all discovered datasets:
-#    bash scripts/classe/run_cluster_inference.sh
+# Normal usage - submits all discovered datasets:
+#   bash scripts/classe/run_cluster_inference.sh
 #
-# Example overrides:
-#   TREE_COUNTS="8 16" SAMPLE_PROBS="0.05 0.1 0.2" SBATCH_TIME=1-00:00:00 SBATCH_MEM=32G\
-#     bash scripts/classe/run_cluster_inference.sh
+# Common overrides:
+#
+#   TREE_COUNTS="8" NUM_RESTARTS=10 SBATCH_TIME=1:00:00 SBATCH_MEM=24G bash scripts/classe/run_cluster_inference.sh
 #
 # Dataset layout (same as TROUPE experiment):
 #   <EXPERIMENT_ROOT>/trees_<n>/time_<t>/sample_<p>/trial_<k>/trees.pkl
@@ -20,31 +20,33 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WORKDIR="${WORKDIR:-$(cd -- "${SCRIPT_DIR}/../.." && pwd)}"
 
 EXPERIMENT_ROOT="${EXPERIMENT_ROOT:-${WORKDIR}/data/subsampled_leaves_4_terminals}"
-RESULTS_ROOT="${RESULTS_ROOT:-${WORKDIR}/results/subsampled_leaves_4_terminals/classe_unconstrained/}"
+RESULTS_ROOT="${RESULTS_ROOT:-${WORKDIR}/results/subsampled_leaves_4_terminals/classe}"
 
-PYTHON_BIN="${PYTHON_BIN:-${WORKDIR}/../.venv/bin/python}"
+PYTHON_BIN="${PYTHON_BIN:-${WORKDIR}/.venv/bin/python}"
 VENV_ACTIVATE="${VENV_ACTIVATE:-}"
 
 # Space-delimited list of hidden-state counts to evaluate per dataset.
 NUM_HIDDEN_VALUES="${NUM_HIDDEN_VALUES:-4}"
 # L1 regularisation on off-diagonal birth-kernel entries (default: none).
 L1="${L1:-0.0}"
+# Number of random restarts per job (restart 0 is deterministic).
+NUM_RESTARTS="${NUM_RESTARTS:-1}"
 DEVICE="${DEVICE:-cpu}"
 UNCONSTRAINED_EXTRA_ARGS="${UNCONSTRAINED_EXTRA_ARGS:-}"
 
 # Filters: space-delimited lists; leave empty to include all.
 TREE_COUNTS="${TREE_COUNTS:-}"
 PROCESS_TIMES="${PROCESS_TIMES:-}"
-SAMPLE_PROBS="${SAMPLE_PROBS:-}"
+SAMPLE_PROBS="${SAMPLE_PROBS:-0.05 0.1 0.2}"
 TRIALS="${TRIALS:-}"
 
 SKIP_EXISTING="${SKIP_EXISTING:-1}"
 DRY_RUN="${DRY_RUN:-0}"
 JOB_NAME_PREFIX="${JOB_NAME_PREFIX:-uncon}"
 
-SBATCH_TIME="${SBATCH_TIME:-12:00:00}"
-SBATCH_CPUS="${SBATCH_CPUS:-4}"
-SBATCH_MEM="${SBATCH_MEM:-32G}"
+SBATCH_TIME="${SBATCH_TIME:-6:00:00}"
+SBATCH_CPUS="${SBATCH_CPUS:-2}"
+SBATCH_MEM="${SBATCH_MEM:-16G}"
 SBATCH_PARTITION="${SBATCH_PARTITION:-}"
 SBATCH_ACCOUNT="${SBATCH_ACCOUNT:-}"
 SBATCH_QOS="${SBATCH_QOS:-}"
@@ -123,11 +125,12 @@ run_one_job() {
 
     local -a cmd=(
         "${PYTHON_BIN}"
-        "troupe/scripts/run_classe_unconstrained.py"
+        "../troupe/scripts/run_classe_unconstrained.py"
         "-i"  "${trees_file}"
         "-o"  "${outdir}"
         "--sampling_probability" "${sampling_prob}"
         "--num_hidden"           "${num_hidden}"
+        "--num_restarts"         "${NUM_RESTARTS}"
         "--l1"                   "${L1}"
         "--device"               "${DEVICE}"
     )
@@ -269,7 +272,7 @@ submit_jobs() {
 
     # Export all runtime config so array tasks inherit it.
     export WORKDIR PYTHON_BIN VENV_ACTIVATE
-    export NUM_HIDDEN_VALUES L1 DEVICE UNCONSTRAINED_EXTRA_ARGS SKIP_EXISTING
+    export NUM_HIDDEN_VALUES L1 NUM_RESTARTS DEVICE UNCONSTRAINED_EXTRA_ARGS SKIP_EXISTING
 
     if [[ "${DRY_RUN}" == "1" ]]; then
         printf 'DRY RUN: would submit array of %d tasks\n' "${n_jobs}"

@@ -129,7 +129,7 @@ run_one_job() {
 
     local -a cmd=(
         "${PYTHON_BIN}"
-        "troupe/scripts/run_classe_troupe.py"
+        "../troupe/scripts/run_classe_troupe.py"
         "-i"  "${trees_file}"
         "-o"  "${outdir}"
         "--sampling_probability" "${sampling_prob}"

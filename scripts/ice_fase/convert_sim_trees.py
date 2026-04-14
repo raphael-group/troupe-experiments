@@ -3,16 +3,15 @@
 Convert pickled ETE3 trees into Newick + per-leaf state TSVs.
 
 Expected input files (inside --folder):
-  trees_<num_trees>_trial_<trial>.pkl
+  trees_<num_trees>/time_<time>/sample_<sample>/trial_<trial>/trees.pkl
 
-Outputs (inside --folder/<num_trees>/trial_<trial>/):
+Outputs (inside --folder/trees_<num_trees>/time_<time>/sample_<sample>/trial_<trial>/tree_nwks):
   tree_<i>.nw
   tree_<i>_states.tsv
   <num_trees>_trial_<trial>_locations.tsv
 
 Example:
-  python view_trees.py --folder /path/to/sims --num_trees 8 16 32
-  python view_trees.py --folder . --num_trees 64 --num_trials 10
+  python convert_sim_trees.py --folder /path/to/sims --num_trees 8 16 32 64 --num_trials 10
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ from pathlib import Path
 from typing import Collection, Dict, List, Tuple
 
 import pandas as pd
-from ete3 import Tree  # noqa: F401
+from ete3 import Tree 
 
 
 def get_state_file(tree) -> pd.DataFrame:
@@ -91,27 +90,23 @@ def prune_leaves_by_state(tree, allowed_states: Collection, missing_policy: str 
 
 
 def process_one_trial(
-    folder: Path,
-    num_trees: int,
-    trial: int,
-    allowed_states=(0, 1, 2, 3),
-    missing_policy: str = "drop",
-    limit: int | None = None,
+    input_dir: Path,
+    allowed_states=('4', '5', '6', '7'),
+    missing_policy: str = "drop"
 ):
-    # pkl_path = folder / f"trees_{num_trees}_trial_{trial}.pkl"
-    pkl_path = folder / str(num_trees) / f"trial_{trial}" / "trees.pkl"
+    pkl_path = input_dir / "trees.pkl"
     if not pkl_path.exists():
         raise FileNotFoundError(f"Missing input pickle: {pkl_path}")
 
-    out_dir = folder / str(num_trees) / f"trial_{trial}"
+    out_dir = input_dir / "tree_nwks"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     trees = pic.load(open(pkl_path, "rb"))
-    if not isinstance(trees, (list, tuple)):
+    if not isinstance(trees, list):
         raise TypeError(f"Expected list/tuple of trees in {pkl_path}, got {type(trees)}")
 
     locations: List[Tuple[str, str]] = []
-    n = len(trees) if limit is None else min(len(trees), limit)
+    n = len(trees)
 
     for i in range(n):
         t = trees[i]
@@ -130,12 +125,10 @@ def process_one_trial(
 
         locations.append((str(newick_path.resolve()), str(states_path.resolve())))
 
-    loc_path = out_dir / f"{num_trees}_trial_{trial}_locations.tsv"
+    loc_path = out_dir / f"locations.tsv"
     pd.DataFrame(locations).to_csv(loc_path, sep="\t", index=False, header=False)
 
     return {
-        "num_trees": num_trees,
-        "trial": trial,
         "input_pickle": str(pkl_path),
         "output_dir": str(out_dir),
         "n_written": n,
@@ -153,18 +146,23 @@ def parse_args():
         nargs="+",
     )
     ap.add_argument(
+        "--samples",
+        required=True,
+        type=float,
+        nargs="+",
+    )
+    ap.add_argument(
         "--num_trials",
         type=int,
-        default=5,
-        help="Number of trials (default=5 → trials 0 to 4)",
+        default=10,
+        help="Number of trials (default=10 -> trials 0 to 9)",
     )
-    ap.add_argument("--allowed_states", type=int, nargs="*", default=[0, 1, 2, 3])
+    ap.add_argument("--allowed_states", type=int, nargs="*", default=['4', '5', '6', '7'])
     ap.add_argument(
         "--missing_policy",
         choices=["drop", "keep", "error"],
         default="drop",
     )
-    ap.add_argument("--limit", type=int, default=None)
     return ap.parse_args()
 
 
@@ -176,20 +174,18 @@ def main():
         raise FileNotFoundError(f"--folder does not exist: {folder}")
 
     for nt in args.num_trees:
-        for trial in range(args.num_trials):
-            info = process_one_trial(
-                folder=folder,
-                num_trees=nt,
-                trial=trial,
-                allowed_states=args.allowed_states,
-                missing_policy=args.missing_policy,
-                limit=args.limit,
-            )
-            print(
-                f"[num_trees={info['num_trees']}, trial={info['trial']}] "
-                f"wrote {info['n_written']} trees -> {info['output_dir']} "
-                f"(locations: {info['locations_file']})"
-            )
+        for sample in args.samples:
+            for trial in range(args.num_trials):
+                input_dir = folder / f"trees_{nt}" / "time_5.0" / f"sample_{sample}" / f"trial_{trial}"
+                info = process_one_trial(
+                    input_dir=input_dir,
+                    allowed_states=args.allowed_states,
+                    missing_policy=args.missing_policy
+                )
+                print(
+                    f"wrote {info['n_written']} trees -> {info['output_dir']} "
+                    f"(locations: {info['locations_file']})"
+                )
 
 
 if __name__ == "__main__":
