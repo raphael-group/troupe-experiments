@@ -32,5 +32,3 @@ To get results for each method run the corresponding cluster script. For example
 ```
 bash scripts/troupe/run_cluster_inference.sh
 ```
-
-To evaluate results...
